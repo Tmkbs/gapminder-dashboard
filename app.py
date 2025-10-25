@@ -1,5 +1,9 @@
 import dash
+<<<<<<< HEAD
 from dash import Dash, dcc, html, callback, Input, Output
+=======
+from dash import Dash dcc, html, callback, Input, Output
+>>>>>>> eca0b510117fd46dc37d3adaf0dc8ceeb8e49246
 import plotly.express as px
 import pandas as pd
 from plotly.data import gapminder
