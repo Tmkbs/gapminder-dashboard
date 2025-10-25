@@ -3,9 +3,7 @@ from dash import Dash, dcc, html, callback, Input, Output
 import plotly.express as px
 import pandas as pd
 from plotly.data import gapminder
-# --- ADDED BACK: This import is needed for the data table ---
 import plotly.graph_objects as go
-# -----------------------------------------------------------
 import dash_bootstrap_components as dbc
 from flask import Flask
 
@@ -20,11 +18,9 @@ app = Dash(
 )
 
 # ------------------------------ DATA LOADING & CLEANING ------------------------------
-# We use the original dataframe for the table to show all data
 gapminder_df = gapminder(datetimes=True, centroids=True, pretty_names=True)
 gapminder_df["Year"] = gapminder_df.Year.dt.year
 
-# We use the cleaned dataframe for the charts
 def remove_outliers(df, column):
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
@@ -43,7 +39,6 @@ years = gapminder_df_cleaned.Year.unique()
 # ------------------------------ CHART CREATION FUNCTIONS --------------------------------
 chart_template = "lux"
 
-# --- ADDED BACK: The function to create the data table ---
 def create_table():
     fig = go.Figure(data=[go.Table(
         header=dict(values=list(gapminder_df.columns),
@@ -56,7 +51,6 @@ def create_table():
     ])
     fig.update_layout(margin=dict(l=5, r=5, t=5, b=5))
     return fig
-# -------------------------------------------------------
 
 def create_population_chart(continent, year):
     df = gapminder_df_cleaned[(gapminder_df_cleaned.Continent == continent) & (gapminder_df_cleaned.Year == year)]
@@ -114,11 +108,9 @@ sidebar = dbc.Col([
 
 content = dbc.Col([
     dbc.Tabs([
-        # --- ADDED BACK: The Dataset Tab is now the first tab ---
         dbc.Tab(label="Dataset", children=[
             dcc.Graph(figure=create_table(), style={'height': '80vh'})
         ]),
-        # --------------------------------------------------------
         dbc.Tab(label="Key Metrics", children=[
             dbc.Row([
                 dbc.Col(dcc.Graph(id="population-chart"), width=12, lg=4),
@@ -134,20 +126,28 @@ content = dbc.Col([
 
 app.layout = html.Div([ header, dbc.Container([ dbc.Row([ sidebar, content ]) ], fluid=True) ])
 
-# ------------------------------ CALLBACK FUNCTIONS -----------------------------------
+# ------------------------------ CALLBACK FUNCTIONS (WITH BUG FIX) -----------------------------------
 @callback(
     [Output("population-chart", "figure"), Output("gdp-chart", "figure"), Output("life-exp-chart", "figure")],
     [Input("continent-filter", "value"), Input("year-slider", "value")]
 )
 def update_bar_charts(continent, year):
-    return create_population_chart(continent, year), create_gdp_chart(continent, year), create_life_exp_chart(continent, year)
+    # --- THIS IS THE FIX: Convert year from slider to integer ---
+    year_int = int(year)
+    return (
+        create_population_chart(continent, year_int),
+        create_gdp_chart(continent, year_int),
+        create_life_exp_chart(continent, year_int)
+    )
 
 @callback(
     Output("choropleth-map", "figure"),
     [Input("map-var-filter", "value"), Input("year-slider", "value")]
 )
 def update_map(variable, year):
-    return create_choropleth_map(variable, year)
+    # --- THIS IS THE FIX: Convert year from slider to integer ---
+    year_int = int(year)
+    return create_choropleth_map(variable, year_int)
 
 # ------------------------------ RUNNER (for local testing) ----------------------
 # if __name__ == "__main__":
