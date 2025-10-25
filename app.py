@@ -1,27 +1,30 @@
-from flask import Flask
-from plotly.data import gapminder
-from dash import dcc, html, Dash, callback, Input, Output
+import dash
+from dash import dcc, html, callback, Input, Output
 import plotly.express as px
-import plotly.graph_objects as go
 import pandas as pd
+from plotly.data import gapminder
 
-# 1. 初始化 Flask 服务器
+# 1. 引入 dash-bootstrap-components 库和图标
+import dash_bootstrap_components as dbc
+
+# ------------------------------ APP 初始化 ---------------------------------
+# 使用 Flask 服务器
+from flask import Flask
 server = Flask(__name__)
 
-# 2. 准备 CSS 并将 Dash 附加到 Flask 服务器
-css = ["https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css", ]
+# 2. 指定使用 LUX 主题和 Font Awesome 图标
 app = Dash(
-    name="Gapminder Dashboard",
-    external_stylesheets=css,
+    __name__,
     server=server,
-    url_base_pathname='/'
+    external_stylesheets=[dbc.themes.LUX, dbc.icons.FONT_AWESOME],
+    suppress_callback_exceptions=True,
+    title="Gapminder Ultimate Dashboard"
 )
 
-################### DATASET & 数据清洗 ####################################
+# ------------------------------ 数据加载与清洗 ------------------------------
 gapminder_df = gapminder(datetimes=True, centroids=True, pretty_names=True)
 gapminder_df["Year"] = gapminder_df.Year.dt.year
 
-# 异常值处理函数 (我们之前加的，继续保留)
 def remove_outliers(df, column):
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
@@ -34,119 +37,143 @@ gapminder_df_cleaned = gapminder_df.copy()
 for col in ["Population", "GDP per Capita", "Life Expectancy"]:
     gapminder_df_cleaned = remove_outliers(gapminder_df_cleaned, col)
 
-# 图表创建函数 (这部分不用变)
-def create_table():
-    fig = go.Figure(data=[go.Table(header=dict(values=gapminder_df.columns, align='left'), cells=dict(values=gapminder_df.values.T, align='left'))])
-    fig.update_layout(paper_bgcolor="#ffffff", margin={"t":0, "l":0, "r":0, "b":0})
+continents = gapminder_df_cleaned.Continent.unique()
+years = gapminder_df_cleaned.Year.unique()
+
+# ------------------------------ 图表创建函数 (注入主题模板) ------------------
+# 3. 为所有图表注入 'lux' 主题模板，使其风格统一
+chart_template = "lux"
+
+def create_population_chart(continent, year):
+    df = gapminder_df_cleaned[(gapminder_df_cleaned.Continent == continent) & (gapminder_df_cleaned.Year == year)]
+    df = df.sort_values(by="Population", ascending=False).head(15)
+    fig = px.bar(df, x="Country", y="Population", color="Country", template=chart_template,
+                 title=f"Top 15 Population in {continent} ({year})")
+    fig.update_layout(showlegend=False, title_x=0.5)
     return fig
 
-def create_population_chart(continent="Asia", year=1952):
-    filtered_df = gapminder_df_cleaned[(gapminder_df_cleaned.Continent==continent) & (gapminder_df_cleaned.Year==year)]
-    filtered_df = filtered_df.sort_values(by="Population", ascending=False).head(15)
-    fig = px.bar(filtered_df, x="Country", y="Population", color="Country", title=f"Population for {continent} in {year}", text_auto=True)
-    fig.update_layout(paper_bgcolor="#ffffff")
+def create_gdp_chart(continent, year):
+    df = gapminder_df_cleaned[(gapminder_df_cleaned.Continent == continent) & (gapminder_df_cleaned.Year == year)]
+    df = df.sort_values(by="GDP per Capita", ascending=False).head(15)
+    fig = px.bar(df, x="Country", y="GDP per Capita", color="Country", template=chart_template,
+                 title=f"Top 15 GDP Per Capita in {continent} ({year})")
+    fig.update_layout(showlegend=False, title_x=0.5)
     return fig
 
-def create_gdp_chart(continent="Asia", year=1952):
-    filtered_df = gapminder_df_cleaned[(gapminder_df_cleaned.Continent==continent) & (gapminder_df_cleaned.Year==year)]
-    filtered_df = filtered_df.sort_values(by="GDP per Capita", ascending=False).head(15)
-    fig = px.bar(filtered_df, x="Country", y="GDP per Capita", color="Country", title=f"GDP per Capita for {continent} in {year}", text_auto=True)
-    fig.update_layout(paper_bgcolor="#ffffff")
-    return fig
-
-def create_life_exp_chart(continent="Asia", year=1952):
-    filtered_df = gapminder_df_cleaned[(gapminder_df_cleaned.Continent==continent) & (gapminder_df_cleaned.Year==year)]
-    filtered_df = filtered_df.sort_values(by="Life Expectancy", ascending=False).head(15)
-    fig = px.bar(filtered_df, x="Country", y="Life Expectancy", color="Country", title=f"Life Expectancy for {continent} in {year}", text_auto=True)
-    fig.update_layout(paper_bgcolor="#ffffff")
+def create_life_exp_chart(continent, year):
+    df = gapminder_df_cleaned[(gapminder_df_cleaned.Continent == continent) & (gapminder_df_cleaned.Year == year)]
+    df = df.sort_values(by="Life Expectancy", ascending=False).head(15)
+    fig = px.bar(df, x="Country", y="Life Expectancy", color="Country", template=chart_template,
+                 title=f"Top 15 Life Expectancy in {continent} ({year})")
+    fig.update_layout(showlegend=False, title_x=0.5)
     return fig
 
 def create_choropleth_map(variable, year):
-    filtered_df = gapminder_df_cleaned[gapminder_df_cleaned.Year==year]
-    fig = px.choropleth(filtered_df, color=variable, locations="ISO Alpha Country Code", locationmode="ISO-3",
-                        color_continuous_scale="RdYlBu", hover_data=["Country", variable], title=f"{variable} Choropleth Map [{year}]")
-    fig.update_layout(dragmode=False, paper_bgcolor="#ffffff", margin={"l":0, "r":0})
+    df = gapminder_df_cleaned[gapminder_df_cleaned.Year == year]
+    fig = px.choropleth(df, color=variable, locations="ISO Alpha Country Code", locationmode="ISO-3",
+                        template=chart_template, hover_data=["Country", variable],
+                        title=f"Global {variable} Map ({year})")
+    fig.update_layout(title_x=0.5, geo=dict(bgcolor='rgba(0,0,0,0)'))
     return fig
 
-##################### 全局筛选器变量 ####################################
-continents = gapminder_df.Continent.unique()
-years = gapminder_df.Year.unique()
-
-##################### 全新布局：侧边栏 + 内容区 ###########################
-# 创建侧边栏
-sidebar = html.Div(
-    [
-        html.H4("筛选器", className="display-6"),
-        html.Hr(),
-        html.P("选择参数来更新图表", className="lead"),
-        html.H5("条形图筛选"),
-        html.Label("大洲 (Continent):"),
-        dcc.Dropdown(id="continent-filter", options=continents, value="Asia", clearable=False),
-        html.Br(),
-        html.Label("年份 (Year):"),
-        dcc.Dropdown(id="year-filter", options=years, value=1952, clearable=False),
-        html.Hr(),
-        html.H5("世界地图筛选"),
-        html.Label("变量 (Variable):"),
-        dcc.Dropdown(id="var-map-filter", options=["Population", "GDP per Capita", "Life Expectancy"], value="Life Expectancy", clearable=False),
-        html.Br(),
-        html.Label("年份 (Year):"),
-        dcc.Dropdown(id="year-map-filter", options=years, value=1952, clearable=False),
-    ],
-    className="col-md-3 col-lg-2 p-3 bg-light", # 使用 Bootstrap 列定义宽度
-    style={"height": "100vh"}
+# ------------------------------ 定义布局组件 --------------------------------
+# 4. 使用 DBC 组件构建一个更精致、响应式的布局
+header = html.Header(
+    dbc.Container([
+        html.H1("Gapminder 全球数据透视", className="text-white my-2"),
+        html.P("探索世界各国的人口、财富与健康", className="text-light")
+    ], fluid=True, className="py-3"),
+    className="bg-primary shadow-sm"
 )
 
-# 创建内容区
-content = html.Div(
-    [
-        html.H1("Gapminder 数据分析仪表盘", className="text-center fw-bold p-3"),
-        dcc.Tabs(id="tabs", children=[
-            dcc.Tab(label="数据集", children=[dcc.Graph(figure=create_table())]),
-            dcc.Tab(label="人口", children=[dcc.Graph(id="population-chart")]),
-            dcc.Tab(label="人均GDP", children=[dcc.Graph(id="gdp-chart")]),
-            dcc.Tab(label="预期寿命", children=[dcc.Graph(id="life-exp-chart")]),
-            dcc.Tab(label="世界地图", children=[dcc.Graph(id="choropleth-map")]),
-        ])
-    ],
-    className="col-md-9 col-lg-10 p-3" # 定义内容区宽度
-)
-
-# 组合成最终布局
-app.layout = html.Div([
+sidebar = dbc.Col([
     html.Div([
-        sidebar,
-        content
-    ], className="row g-0") # g-0 移除列之间的间隙
-], className="container-fluid", style={"backgroundColor": "#f8f9fa"})
+        html.I(className="fas fa-compass-drafting fa-2x text-primary"),
+        html.H4("控制面板", className="ms-2 d-inline-block align-middle")
+    ], className="d-flex align-items-center mb-4"),
 
+    dbc.Row([
+        dbc.Label("大洲 (Continent)"),
+        dcc.Dropdown(id="continent-filter", options=continents, value="Asia", clearable=False),
+    ], className="mb-3"),
 
-##################### 回调函数 (Callbacks) 更新 ####################################
-# 注意：Input 的 ID 已经更新为侧边栏里新的 Dropdown ID
+    dbc.Row([
+        dbc.Label("年份 (Year)"),
+        dcc.Slider(
+            id='year-slider', min=years.min(), max=years.max(), step=None,
+            marks={str(year): str(year) for year in years if year % 10 == 2 or year == 2007},
+            value=1952,
+        ),
+    ], className="mb-4"),
+
+    html.Hr(),
+    html.H5("世界地图变量", className="mt-4"),
+
+    dbc.Row([
+        dbc.Label("指标 (Metric)"),
+        dbc.RadioItems(
+            id='map-var-filter',
+            options=[
+                {"label": " 人口", "value": "Population"},
+                {"label": " 人均 GDP", "value": "GDP per Capita"},
+                {"label": " 预期寿命", "value": "Life Expectancy"},
+            ],
+            value="Life Expectancy",
+            inline=False,
+            labelClassName="me-2",
+            inputClassName="me-1",
+        )
+    ]),
+], width=12, lg=2, className="p-4 bg-light border-end")
+
+content = dbc.Col([
+    dbc.Tabs([
+        dbc.Tab(label=html.Span([html.I(className="fas fa-chart-bar me-2"), "关键指标"]), children=[
+            dbc.Row([
+                dbc.Col(dcc.Graph(id="population-chart"), width=12, lg=4),
+                dbc.Col(dcc.Graph(id="gdp-chart"), width=12, lg=4),
+                dbc.Col(dcc.Graph(id="life-exp-chart"), width=12, lg=4),
+            ], className="g-4 p-4")
+        ]),
+        dbc.Tab(label=html.Span([html.I(className="fas fa-globe-americas me-2"), "世界地图"]), children=[
+            dbc.Row(dbc.Col(dcc.Graph(id="choropleth-map", style={'height': '70vh'}), width=12), className="p-4")
+        ]),
+    ])
+], width=12, lg=10)
+
+app.layout = html.Div([
+    header,
+    dbc.Container([
+        dbc.Row([
+            sidebar,
+            content
+        ])
+    ], fluid=True)
+])
+
+# ------------------------------ 回调函数 -----------------------------------
 @callback(
     Output("population-chart", "figure"),
-    [Input("continent-filter", "value"), Input("year-filter", "value")]
-)
-def update_population_chart(continent, year):
-    return create_population_chart(continent, year)
-
-@callback(
     Output("gdp-chart", "figure"),
-    [Input("continent-filter", "value"), Input("year-filter", "value")]
-)
-def update_gdp_chart(continent, year):
-    return create_gdp_chart(continent, year)
-
-@callback(
     Output("life-exp-chart", "figure"),
-    [Input("continent-filter", "value"), Input("year-filter", "value")]
+    Input("continent-filter", "value"),
+    Input("year-slider", "value")
 )
-def update_life_exp_chart(continent, year):
-    return create_life_exp_chart(continent, year)
+def update_bar_charts(continent, year):
+    return (
+        create_population_chart(continent, year),
+        create_gdp_chart(continent, year),
+        create_life_exp_chart(continent, year)
+    )
 
 @callback(
     Output("choropleth-map", "figure"),
-    [Input("var-map-filter", "value"), Input("year-map-filter", "value")]
+    Input("map-var-filter", "value"),
+    Input("year-slider", "value") # 地图也受年份滑块控制
 )
 def update_map(variable, year):
     return create_choropleth_map(variable, year)
+
+# ------------------------------ 运行 (本地测试时使用) ----------------------
+# if __name__ == "__main__":
+#     app.run_server(debug=True)
