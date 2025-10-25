@@ -1,14 +1,14 @@
 import dash
-# ------------------------------ 这是修正过的关键一行 -------------------------
+# --- This is the corrected, critical import line ---
 from dash import Dash, dcc, html, callback, Input, Output
-# --------------------------------------------------------------------------
+# ----------------------------------------------------
 import plotly.express as px
 import pandas as pd
 from plotly.data import gapminder
 import dash_bootstrap_components as dbc
 from flask import Flask
 
-# ------------------------------ APP 初始化 ---------------------------------
+# ------------------------------ APP INITIALIZATION ---------------------------------
 server = Flask(__name__)
 app = Dash(
     __name__,
@@ -18,7 +18,7 @@ app = Dash(
     title="Gapminder Ultimate Dashboard"
 )
 
-# ------------------------------ 数据加载与清洗 ------------------------------
+# ------------------------------ DATA LOADING & CLEANING ------------------------------
 gapminder_df = gapminder(datetimes=True, centroids=True, pretty_names=True)
 gapminder_df["Year"] = gapminder_df.Year.dt.year
 
@@ -37,7 +37,7 @@ for col in ["Population", "GDP per Capita", "Life Expectancy"]:
 continents = gapminder_df_cleaned.Continent.unique()
 years = gapminder_df_cleaned.Year.unique()
 
-# ------------------------------ 图表创建函数 --------------------------------
+# ------------------------------ CHART CREATION FUNCTIONS --------------------------------
 chart_template = "lux"
 
 def create_population_chart(continent, year):
@@ -72,11 +72,11 @@ def create_choropleth_map(variable, year):
     fig.update_layout(title_x=0.5, geo=dict(bgcolor='rgba(0,0,0,0)'))
     return fig
 
-# ------------------------------ 布局定义 --------------------------------
+# ------------------------------ LAYOUT DEFINITION --------------------------------
 header = html.Header(
     dbc.Container([
-        html.H1("Gapminder 全球数据透视", className="text-white my-2"),
-        html.P("探索世界各国的人口、财富与健康", className="text-light")
+        html.H1("Gapminder Global Data Insights", className="text-white my-2"),
+        html.P("Explore the population, wealth, and health of nations", className="text-light")
     ], fluid=True, className="py-3"),
     className="bg-primary shadow-sm"
 )
@@ -84,26 +84,27 @@ header = html.Header(
 sidebar = dbc.Col([
     html.Div([
         html.I(className="fas fa-compass-drafting fa-2x text-primary"),
-        html.H4("控制面板", className="ms-2 d-inline-block align-middle")
+        html.H4("Control Panel", className="ms-2 d-inline-block align-middle")
     ], className="d-flex align-items-center mb-4"),
 
-    dbc.Row([ dbc.Label("大洲 (Continent)"), dcc.Dropdown(id="continent-filter", options=continents, value="Asia", clearable=False), ], className="mb-3"),
-    dbc.Row([ dbc.Label("年份 (Year)"), dcc.Slider(id='year-slider', min=years.min(), max=years.max(), step=None, marks={str(year): str(year) for year in years if year % 10 == 2 or year == 2007}, value=1952), ], className="mb-4"),
+    dbc.Row([ dbc.Label("Continent"), dcc.Dropdown(id="continent-filter", options=continents, value="Asia", clearable=False), ], className="mb-3"),
+    dbc.Row([ dbc.Label("Year"), dcc.Slider(id='year-slider', min=years.min(), max=years.max(), step=None, marks={str(year): str(year) for year in years if year % 10 == 2 or year == 2007}, value=1952), ], className="mb-4"),
     html.Hr(),
-    html.H5("世界地图变量", className="mt-4"),
-    dbc.Row([ dbc.Label("指标 (Metric)"), dbc.RadioItems( id='map-var-filter', options=[ {"label": " 人口", "value": "Population"}, {"label": " 人均 GDP", "value": "GDP per Capita"}, {"label": " 预期寿命", "value": "Life Expectancy"}, ], value="Life Expectancy", inline=False, labelClassName="me-2", inputClassName="me-1", ) ]),
+    html.H5("World Map Variable", className="mt-4"),
+    dbc.Row([ dbc.Label("Metric"), dbc.RadioItems( id='map-var-filter', options=[ {"label": " Population", "value": "Population"}, {"label": " GDP per Capita", "value": "GDP per Capita"}, {"label": " Life Expectancy", "value": "Life Expectancy"}, ], value="Life Expectancy", inline=False, labelClassName="me-2", inputClassName="me-1", ) ]),
 ], width=12, lg=2, className="p-4 bg-light border-end")
 
 content = dbc.Col([
     dbc.Tabs([
-        dbc.Tab(label="关键指标", children=[
+        # --- This is the corrected section: 'label' must be a simple string ---
+        dbc.Tab(label="Key Metrics", children=[
             dbc.Row([
                 dbc.Col(dcc.Graph(id="population-chart"), width=12, lg=4),
                 dbc.Col(dcc.Graph(id="gdp-chart"), width=12, lg=4),
                 dbc.Col(dcc.Graph(id="life-exp-chart"), width=12, lg=4),
             ], className="g-4 p-4")
         ]),
-        dbc.Tab(label="世界地图", children=[
+        dbc.Tab(label="World Map", children=[
             dbc.Row(dbc.Col(dcc.Graph(id="choropleth-map", style={'height': '70vh'}), width=12), className="p-4")
         ]),
     ])
@@ -111,7 +112,7 @@ content = dbc.Col([
 
 app.layout = html.Div([ header, dbc.Container([ dbc.Row([ sidebar, content ]) ], fluid=True) ])
 
-# ------------------------------ 回调函数 -----------------------------------
+# ------------------------------ CALLBACK FUNCTIONS -----------------------------------
 @callback(
     [Output("population-chart", "figure"), Output("gdp-chart", "figure"), Output("life-exp-chart", "figure")],
     [Input("continent-filter", "value"), Input("year-slider", "value")]
@@ -126,6 +127,6 @@ def update_bar_charts(continent, year):
 def update_map(variable, year):
     return create_choropleth_map(variable, year)
 
-# ------------------------------ 运行 (本地测试时使用) ----------------------
+# ------------------------------ RUNNER (for local testing) ----------------------
 # if __name__ == "__main__":
 #     app.run_server(debug=True)
