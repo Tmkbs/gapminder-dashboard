@@ -1,10 +1,11 @@
 import dash
-# --- This is the corrected, critical import line ---
 from dash import Dash, dcc, html, callback, Input, Output
-# ----------------------------------------------------
 import plotly.express as px
 import pandas as pd
 from plotly.data import gapminder
+# --- ADDED BACK: This import is needed for the data table ---
+import plotly.graph_objects as go
+# -----------------------------------------------------------
 import dash_bootstrap_components as dbc
 from flask import Flask
 
@@ -19,9 +20,11 @@ app = Dash(
 )
 
 # ------------------------------ DATA LOADING & CLEANING ------------------------------
+# We use the original dataframe for the table to show all data
 gapminder_df = gapminder(datetimes=True, centroids=True, pretty_names=True)
 gapminder_df["Year"] = gapminder_df.Year.dt.year
 
+# We use the cleaned dataframe for the charts
 def remove_outliers(df, column):
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
@@ -39,6 +42,21 @@ years = gapminder_df_cleaned.Year.unique()
 
 # ------------------------------ CHART CREATION FUNCTIONS --------------------------------
 chart_template = "lux"
+
+# --- ADDED BACK: The function to create the data table ---
+def create_table():
+    fig = go.Figure(data=[go.Table(
+        header=dict(values=list(gapminder_df.columns),
+                    fill_color='royalblue',
+                    align='left',
+                    font=dict(color='white', size=12)),
+        cells=dict(values=[gapminder_df[col] for col in gapminder_df.columns],
+                   fill_color='lavender',
+                   align='left'))
+    ])
+    fig.update_layout(margin=dict(l=5, r=5, t=5, b=5))
+    return fig
+# -------------------------------------------------------
 
 def create_population_chart(continent, year):
     df = gapminder_df_cleaned[(gapminder_df_cleaned.Continent == continent) & (gapminder_df_cleaned.Year == year)]
@@ -96,7 +114,11 @@ sidebar = dbc.Col([
 
 content = dbc.Col([
     dbc.Tabs([
-        # --- This is the corrected section: 'label' must be a simple string ---
+        # --- ADDED BACK: The Dataset Tab is now the first tab ---
+        dbc.Tab(label="Dataset", children=[
+            dcc.Graph(figure=create_table(), style={'height': '80vh'})
+        ]),
+        # --------------------------------------------------------
         dbc.Tab(label="Key Metrics", children=[
             dbc.Row([
                 dbc.Col(dcc.Graph(id="population-chart"), width=12, lg=4),
