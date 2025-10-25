@@ -1,18 +1,15 @@
 import dash
+# ------------------------------ 这是修正过的关键一行 -------------------------
 from dash import Dash, dcc, html, callback, Input, Output
+# --------------------------------------------------------------------------
 import plotly.express as px
 import pandas as pd
 from plotly.data import gapminder
-
-# 1. 引入 dash-bootstrap-components 库和图标
 import dash_bootstrap_components as dbc
+from flask import Flask
 
 # ------------------------------ APP 初始化 ---------------------------------
-# 使用 Flask 服务器
-from flask import Flask
 server = Flask(__name__)
-
-# 2. 指定使用 LUX 主题和 Font Awesome 图标
 app = Dash(
     __name__,
     server=server,
@@ -40,8 +37,7 @@ for col in ["Population", "GDP per Capita", "Life Expectancy"]:
 continents = gapminder_df_cleaned.Continent.unique()
 years = gapminder_df_cleaned.Year.unique()
 
-# ------------------------------ 图表创建函数 (注入主题模板) ------------------
-# 3. 为所有图表注入 'lux' 主题模板，使其风格统一
+# ------------------------------ 图表创建函数 --------------------------------
 chart_template = "lux"
 
 def create_population_chart(continent, year):
@@ -76,8 +72,7 @@ def create_choropleth_map(variable, year):
     fig.update_layout(title_x=0.5, geo=dict(bgcolor='rgba(0,0,0,0)'))
     return fig
 
-# ------------------------------ 定义布局组件 --------------------------------
-# 4. 使用 DBC 组件构建一个更精致、响应式的布局
+# ------------------------------ 布局定义 --------------------------------
 header = html.Header(
     dbc.Container([
         html.H1("Gapminder 全球数据透视", className="text-white my-2"),
@@ -92,84 +87,41 @@ sidebar = dbc.Col([
         html.H4("控制面板", className="ms-2 d-inline-block align-middle")
     ], className="d-flex align-items-center mb-4"),
 
-    dbc.Row([
-        dbc.Label("大洲 (Continent)"),
-        dcc.Dropdown(id="continent-filter", options=continents, value="Asia", clearable=False),
-    ], className="mb-3"),
-
-    dbc.Row([
-        dbc.Label("年份 (Year)"),
-        dcc.Slider(
-            id='year-slider', min=years.min(), max=years.max(), step=None,
-            marks={str(year): str(year) for year in years if year % 10 == 2 or year == 2007},
-            value=1952,
-        ),
-    ], className="mb-4"),
-
+    dbc.Row([ dbc.Label("大洲 (Continent)"), dcc.Dropdown(id="continent-filter", options=continents, value="Asia", clearable=False), ], className="mb-3"),
+    dbc.Row([ dbc.Label("年份 (Year)"), dcc.Slider(id='year-slider', min=years.min(), max=years.max(), step=None, marks={str(year): str(year) for year in years if year % 10 == 2 or year == 2007}, value=1952), ], className="mb-4"),
     html.Hr(),
     html.H5("世界地图变量", className="mt-4"),
-
-    dbc.Row([
-        dbc.Label("指标 (Metric)"),
-        dbc.RadioItems(
-            id='map-var-filter',
-            options=[
-                {"label": " 人口", "value": "Population"},
-                {"label": " 人均 GDP", "value": "GDP per Capita"},
-                {"label": " 预期寿命", "value": "Life Expectancy"},
-            ],
-            value="Life Expectancy",
-            inline=False,
-            labelClassName="me-2",
-            inputClassName="me-1",
-        )
-    ]),
+    dbc.Row([ dbc.Label("指标 (Metric)"), dbc.RadioItems( id='map-var-filter', options=[ {"label": " 人口", "value": "Population"}, {"label": " 人均 GDP", "value": "GDP per Capita"}, {"label": " 预期寿命", "value": "Life Expectancy"}, ], value="Life Expectancy", inline=False, labelClassName="me-2", inputClassName="me-1", ) ]),
 ], width=12, lg=2, className="p-4 bg-light border-end")
 
 content = dbc.Col([
     dbc.Tabs([
-        dbc.Tab(label=html.Span([html.I(className="fas fa-chart-bar me-2"), "关键指标"]), children=[
+        dbc.Tab(label="关键指标", children=[
             dbc.Row([
                 dbc.Col(dcc.Graph(id="population-chart"), width=12, lg=4),
                 dbc.Col(dcc.Graph(id="gdp-chart"), width=12, lg=4),
                 dbc.Col(dcc.Graph(id="life-exp-chart"), width=12, lg=4),
             ], className="g-4 p-4")
         ]),
-        dbc.Tab(label=html.Span([html.I(className="fas fa-globe-americas me-2"), "世界地图"]), children=[
+        dbc.Tab(label="世界地图", children=[
             dbc.Row(dbc.Col(dcc.Graph(id="choropleth-map", style={'height': '70vh'}), width=12), className="p-4")
         ]),
     ])
 ], width=12, lg=10)
 
-app.layout = html.Div([
-    header,
-    dbc.Container([
-        dbc.Row([
-            sidebar,
-            content
-        ])
-    ], fluid=True)
-])
+app.layout = html.Div([ header, dbc.Container([ dbc.Row([ sidebar, content ]) ], fluid=True) ])
 
 # ------------------------------ 回调函数 -----------------------------------
 @callback(
-    Output("population-chart", "figure"),
-    Output("gdp-chart", "figure"),
-    Output("life-exp-chart", "figure"),
-    Input("continent-filter", "value"),
-    Input("year-slider", "value")
+    [Output("population-chart", "figure"), Output("gdp-chart", "figure"), Output("life-exp-chart", "figure")],
+    [Input("continent-filter", "value"), Input("year-slider", "value")]
 )
 def update_bar_charts(continent, year):
-    return (
-        create_population_chart(continent, year),
-        create_gdp_chart(continent, year),
-        create_life_exp_chart(continent, year)
-    )
+    return create_population_chart(continent, year), create_gdp_chart(continent, year), create_life_exp_chart(continent, year)
 
 @callback(
     Output("choropleth-map", "figure"),
-    Input("map-var-filter", "value"),
-    Input("year-slider", "value") # 地图也受年份滑块控制
+    [Input("map-var-filter", "value"), Input("year-slider", "value")]
 )
 def update_map(variable, year):
     return create_choropleth_map(variable, year)
