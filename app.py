@@ -1,5 +1,5 @@
 import dash
-from dash import dcc, html, dash_table
+from dash import dcc, html, dash_table, Input, Output
 import dash_bootstrap_components as dbc
 import pandas as pd
 import yfinance as yf
@@ -10,114 +10,119 @@ import random
 import numpy as np
 from datetime import datetime
 
-# --- 1. 极光 UI 系统 (Aurora Glass UI) ---
+# --- 1. 视觉系统: 极光 X (Aurora X) ---
 EXTERNAL_STYLES = [
-    dbc.themes.BOOTSTRAP,
-    "https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400&display=swap"
+    dbc.themes.CYBORG,
+    "https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&family=JetBrains+Mono:wght@400;700&display=swap"
 ]
 
 CUSTOM_CSS = """
-/* 动态极光背景 */
-@keyframes aurora {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-}
+/* 全局动态背景 - 深邃宇宙 */
 body {
-    background: linear-gradient(-45deg, #0f172a, #1e1b4b, #312e81, #0f172a);
-    background-size: 400% 400%;
-    animation: aurora 20s ease infinite;
-    font-family: 'DM Sans', sans-serif;
-    color: #f8fafc;
-    height: 100vh;
-    overflow: hidden;
+    background: radial-gradient(circle at 50% -20%, #2b1055, #7597de 100%);
+    background-color: #050505;
+    font-family: 'Rajdhani', sans-serif;
+    color: #fff;
+    overflow-x: hidden;
     margin: 0;
 }
 
-/* 布局框架 */
-.main-grid {
-    display: grid;
-    grid-template-columns: 260px 1fr;
-    grid-template-rows: 70px 1fr;
-    gap: 20px;
-    height: 100vh;
-    padding: 20px;
-    box-sizing: border-box;
+/* 顶部滚动行情条 */
+.ticker-wrap {
+    width: 100%;
+    background: rgba(0,0,0,0.8);
+    height: 35px;
+    line-height: 35px;
+    white-space: nowrap;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+    overflow: hidden;
+    position: fixed;
+    top: 0;
+    z-index: 9999;
 }
+.ticker-move { display: inline-block; animation: ticker 40s linear infinite; }
+.ticker-item { display: inline-block; padding: 0 30px; font-family: 'JetBrains Mono'; font-size: 12px; }
+@keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
 
-/* 玻璃卡片 */
-.glass {
-    background: rgba(255, 255, 255, 0.03);
+/* 玻璃卡片 X */
+.glass-x {
+    background: rgba(18, 18, 28, 0.65);
     backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    position: relative;
     overflow: hidden;
 }
+/* 卡片光晕动画 */
+.glass-x::after {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%; width: 200%; height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%);
+    transform: rotate(30deg);
+    pointer-events: none;
+}
 
-/* 文字与排版 */
-h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; letter-spacing: -0.5px; margin: 0; }
-.mono { font-family: 'JetBrains Mono', monospace; }
-.label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; font-weight: 600; }
-.val-lg { font-size: 2rem; font-weight: 700; color: white; }
-.val-md { font-size: 1.2rem; font-weight: 600; }
+/* 字体系统 */
+.font-sci { font-family: 'Orbitron', sans-serif; letter-spacing: 2px; }
+.font-data { font-family: 'JetBrains Mono', monospace; }
+.text-neon-blue { color: #00f3ff; text-shadow: 0 0 10px rgba(0, 243, 255, 0.5); }
+.text-neon-pink { color: #ff0055; text-shadow: 0 0 10px rgba(255, 0, 85, 0.5); }
+.text-neon-green { color: #00ff9d; text-shadow: 0 0 10px rgba(0, 255, 157, 0.5); }
 
-/* 颜色系统 (视频同款红绿) */
-.green { color: #4ade80; text-shadow: 0 0 10px rgba(74, 222, 128, 0.2); }
-.red { color: #fb7185; text-shadow: 0 0 10px rgba(251, 113, 133, 0.2); }
+/* Tab 样式重写 */
+.nav-tabs { border-bottom: 1px solid rgba(255,255,255,0.1); }
+.nav-link { color: #888 !important; border: none !important; font-family: 'Orbitron'; letter-spacing: 1px; }
+.nav-link.active { 
+    background-color: transparent !important; 
+    color: #fff !important; 
+    border-bottom: 2px solid #00f3ff !important;
+    text-shadow: 0 0 15px #00f3ff;
+}
 
-/* 表格深度定制 */
+/* 修复表格 */
 .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
-    background-color: rgba(255,255,255,0.05) !important;
-    color: #94a3b8 !important;
-    font-family: 'Outfit';
-    font-weight: 600 !important;
-    border-bottom: 1px solid rgba(255,255,255,0.1) !important;
-    text-align: left !important;
-    padding: 12px !important;
+    background-color: rgba(0,243,255,0.05) !important;
+    color: #00f3ff !important;
+    font-family: 'Orbitron';
+    text-transform: uppercase;
+    border: none !important;
+    font-weight: 900 !important;
 }
 .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td {
     background-color: transparent !important;
-    color: #e2e8f0 !important;
-    font-family: 'DM Sans';
-    border-bottom: 1px solid rgba(255,255,255,0.02) !important;
-    padding: 12px !important;
-    font-size: 0.9rem;
+    color: #eee !important;
+    font-family: 'JetBrains Mono';
+    border: none !important;
+    border-bottom: 1px solid rgba(255,255,255,0.05) !important;
 }
 """
 
 app = dash.Dash(__name__, external_stylesheets=EXTERNAL_STYLES)
 server = app.server
-app.index_string = f'''<!DOCTYPE html><html><head>{{%metas%}}<title>AURORA PRO</title>{{%favicon%}}{{%css%}}<style>{CUSTOM_CSS}</style></head><body>{{%app_entry%}}<footer>{{%config%}}{{%scripts%}}{{%renderer%}}</footer></body></html>'''
+app.index_string = f'''<!DOCTYPE html><html><head>{{%metas%}}<title>AURORA X</title>{{%favicon%}}{{%css%}}<style>{CUSTOM_CSS}</style></head><body>{{%app_entry%}}<footer>{{%config%}}{{%scripts%}}{{%renderer%}}</footer></body></html>'''
 
-# --- 2. 专业数据引擎 (复刻视频里的所有字段) ---
+# --- 2. 数据引擎 (保留强健逻辑) ---
 def get_data_engine():
-    # 路径处理
     base_dir = os.path.dirname(os.path.abspath(__file__))
     excel_path = os.path.join(base_dir, 'portfolio.xlsx')
-    
     df = pd.DataFrame()
     
-    # A. 读取 Excel
     if os.path.exists(excel_path):
-        try:
+        try: 
             df = pd.read_excel(excel_path, engine='openpyxl')
             df.columns = df.columns.str.strip().str.title()
         except: pass
     
-    # B. 默认演示数据 (如果 Excel 挂了)
     if df.empty:
         df = pd.DataFrame([
-            {'Ticker': 'AAPL', 'Action': 'Buy', 'Quantity': 100, 'Price': 130},
-            {'Ticker': 'MSFT', 'Action': 'Buy', 'Quantity': 50, 'Price': 250},
-            {'Ticker': 'NVDA', 'Action': 'Buy', 'Quantity': 20, 'Price': 400},
-            {'Ticker': 'TSLA', 'Action': 'Buy', 'Quantity': 100, 'Price': 180},
-            {'Ticker': 'AMZN', 'Action': 'Buy', 'Quantity': 50, 'Price': 140},
-            {'Ticker': 'GOOGL', 'Action': 'Buy', 'Quantity': 40, 'Price': 120},
+            {'Ticker': 'AAPL', 'Action': 'Buy', 'Quantity': 50, 'Price': 140},
+            {'Ticker': 'NVDA', 'Action': 'Buy', 'Quantity': 20, 'Price': 380},
+            {'Ticker': 'TSLA', 'Action': 'Buy', 'Quantity': 60, 'Price': 190},
+            {'Ticker': 'MSFT', 'Action': 'Buy', 'Quantity': 30, 'Price': 260}
         ])
 
-    # C. 计算持仓 (加权平均)
     portfolio = {}
     for _, row in df.iterrows():
         t = str(row['Ticker']).upper().strip()
@@ -135,163 +140,175 @@ def get_data_engine():
     res.rename(columns={'index': 'Ticker'}, inplace=True)
     res = res[res['qty'] > 0].copy()
 
-    # D. 获取高级数据 (API / 模拟)
+    prices, sectors, betas, caps = [], [], [], []
     is_sim = False
     try:
-        # 尝试连接 Yahoo
         data = yf.Tickers(' '.join(res['Ticker'].tolist()))
-        prices, sectors, market_caps, betas, day_changes = [], [], [], [], []
-        
         for t in res['Ticker']:
             info = data.tickers[t].info
             p = info.get('currentPrice') or info.get('regularMarketPrice')
             if not p: raise Exception
-            
             prices.append(p)
             sectors.append(info.get('sector', 'Unknown'))
-            market_caps.append(info.get('marketCap', 0))
             betas.append(info.get('beta', 1.0))
-            
-            prev = info.get('previousClose', p)
-            day_changes.append((p - prev)/prev)
-            
+            caps.append(info.get('marketCap', 1e9))
     except:
-        # 模拟模式：生成非常真实的数据
         is_sim = True
-        prices, sectors, market_caps, betas, day_changes = [], [], [], [], []
-        
-        sector_map = {
-            'AAPL': 'Technology', 'MSFT': 'Technology', 'NVDA': 'Semiconductors',
-            'TSLA': 'Auto', 'AMZN': 'Consumer', 'GOOGL': 'Communication'
-        }
-        
         for t in res['Ticker']:
-            # 价格模拟
-            cost = portfolio[t]['cost'] / portfolio[t]['qty']
-            prices.append(cost * random.uniform(0.9, 1.4))
-            # 板块模拟
-            sectors.append(sector_map.get(t, random.choice(['Finance', 'Healthcare', 'Energy'])))
-            # 市值模拟 (Billions)
-            market_caps.append(random.uniform(50e9, 2000e9))
-            # Beta 模拟
+            prices.append((portfolio[t]['cost']/portfolio[t]['qty']) * random.uniform(0.92, 1.25))
+            sectors.append(random.choice(['Tech', 'Finance', 'Energy', 'Auto']))
             betas.append(random.uniform(0.8, 2.5))
-            # 日涨跌模拟
-            day_changes.append(random.uniform(-0.04, 0.04))
+            caps.append(random.uniform(1e10, 2e12))
 
-    # E. 组装最终数据表
     res['Price'] = prices
-    res['Change%'] = day_changes
     res['Sector'] = sectors
     res['Beta'] = betas
-    res['Mkt Cap'] = [f"${x/1e9:.1f}B" for x in market_caps] # 格式化为 Billions
+    res['Mkt Cap'] = caps
     
     res['Value'] = res['qty'] * res['Price']
-    res['Cost'] = res['cost']
-    res['Total PnL'] = res['Value'] - res['Cost']
-    res['ROI'] = res['Total PnL'] / res['Cost']
+    res['PnL'] = res['Value'] - res['cost']
+    res['PnL%'] = res['PnL'] / res['cost']
+    res['DayChg'] = np.random.uniform(-0.03, 0.03, len(res)) # 模拟日涨跌
+    res['DayPnL'] = res['Value'] * res['DayChg']
     
-    # 模拟“今日盈亏” (Value * Day Change)
-    res['Day PnL'] = res['Value'] * res['Change%']
+    # 模拟 AI 情感评分 (0-100)
+    res['AI_Score'] = [int(x * 100) for x in np.random.uniform(0.3, 0.95, len(res))]
+    
+    return res, is_sim
 
-    # 汇总
+# --- 3. 布局设计 ---
+def serve_layout():
+    df, is_sim = get_data_engine()
+    
+    # 汇总数据
     kpi = {
-        'total_val': res['Value'].sum(),
-        'total_pnl': res['Total PnL'].sum(),
-        'total_roi': res['Total PnL'].sum() / res['Cost'].sum(),
-        'day_pnl': res['Day PnL'].sum(),
-        'status': "SIMULATION" if is_sim else "LIVE DATA"
+        'val': df['Value'].sum(),
+        'pnl': df['PnL'].sum(),
+        'roi': df['PnL'].sum()/df['cost'].sum() if df['cost'].sum() else 0,
+        'day': df['DayPnL'].sum()
     }
     
-    return res, kpi
+    # 滚动条内容
+    ticker_items = []
+    for _, row in df.iterrows():
+        c = "text-neon-green" if row['DayChg'] >= 0 else "text-neon-pink"
+        s = "▲" if row['DayChg'] >= 0 else "▼"
+        ticker_items.append(html.Span([
+            f"{row['Ticker']} ", html.Span(f"{s}{row['DayChg']:.2%}", className=c), " /// "
+        ], className="ticker-item"))
 
-# --- 3. 布局逻辑 ---
-def serve_layout():
-    df, kpi = get_data_engine()
-    
-    # 图表：板块热力图 (Treemap)
-    fig_tree = px.treemap(df, path=[px.Constant("Portfolio"), 'Sector', 'Ticker'], values='Value',
-                          color='ROI', color_continuous_scale='RdYlGn', color_continuous_midpoint=0)
-    fig_tree.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', margin=dict(t=0,b=0,l=0,r=0))
+    # Tab 1: 指挥塔 (Table + Sunburst)
+    tab1_content = dbc.Row([
+        dbc.Col([
+            html.Div([
+                html.H5("HOLDINGS MATRIX", className="text-neon-blue font-sci mb-3"),
+                dash_table.DataTable(
+                    data=df.to_dict('records'),
+                    columns=[
+                        {'name': 'ASSET', 'id': 'Ticker'},
+                        {'name': 'SECTOR', 'id': 'Sector'},
+                        {'name': 'PRICE', 'id': 'Price', 'type': 'numeric', 'format': {'specifier': '$,.2f'}},
+                        {'name': 'VALUE', 'id': 'Value', 'type': 'numeric', 'format': {'specifier': '$,.0f'}},
+                        {'name': 'PNL', 'id': 'PnL', 'type': 'numeric', 'format': {'specifier': '+,.0f'}},
+                        {'name': 'ROI', 'id': 'PnL%', 'type': 'numeric', 'format': {'specifier': '+.2%'}},
+                    ],
+                    style_as_list_view=True,
+                    sort_action='native',
+                    style_data_conditional=[
+                        {'if': {'filter_query': '{PnL} >= 0', 'column_id': 'PnL'}, 'color': '#00ff9d', 'fontWeight': 'bold'},
+                        {'if': {'filter_query': '{PnL} < 0', 'column_id': 'PnL'}, 'color': '#ff0055', 'fontWeight': 'bold'},
+                        {'if': {'filter_query': '{PnL%} >= 0', 'column_id': 'PnL%'}, 'color': '#00ff9d'},
+                        {'if': {'filter_query': '{PnL%} < 0', 'column_id': 'PnL%'}, 'color': '#ff0055'},
+                    ]
+                )
+            ], className="glass-x p-4 h-100")
+        ], width=12, lg=7),
+        
+        dbc.Col([
+            html.Div([
+                html.H5("SECTOR ALLOCATION", className="text-white font-sci mb-3 text-center"),
+                dcc.Graph(
+                    figure=px.sunburst(df, path=['Sector', 'Ticker'], values='Value', color='PnL%',
+                                     color_continuous_scale='RdYlGn', color_continuous_midpoint=0)
+                    .update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', margin=dict(t=0, b=0, l=0, r=0)),
+                    config={'displayModeBar': False},
+                    style={'height': '350px'}
+                )
+            ], className="glass-x p-4 h-100")
+        ], width=12, lg=5)
+    ], className="mt-4")
 
-    # 图表：Beta vs ROI 散点图 (专业分析)
-    fig_risk = px.scatter(df, x='Beta', y='ROI', size='Value', color='Sector',
-                          hover_name='Ticker', title="Risk (Beta) vs Return")
-    fig_risk.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(255,255,255,0.05)',
-                           margin=dict(t=40,b=20,l=20,r=20), height=250)
+    # Tab 2: 3D 量子实验室 (3D Scatter)
+    fig_3d = px.scatter_3d(df, x='Beta', y='PnL%', z='Mkt Cap', color='Sector', size='Value',
+                           hover_name='Ticker', opacity=0.9, title="3D RISK / REWARD / SIZE ANALYZER")
+    fig_3d.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', scene=dict(
+        xaxis_title='BETA (RISK)', yaxis_title='ROI (REWARD)', zaxis_title='MKT CAP'), margin=dict(l=0, r=0, b=0, t=30), height=500)
 
+    tab2_content = dbc.Row([
+        dbc.Col(html.Div([dcc.Graph(figure=fig_3d)], className="glass-x p-3 mt-4"), width=12)
+    ])
+
+    # Tab 3: AI 情绪 (Gauge Charts)
+    # 选取前3大持仓做仪表盘
+    top_3 = df.nlargest(3, 'Value')
+    gauges = []
+    for _, row in top_3.iterrows():
+        fig_g = go.Figure(go.Indicator(
+            mode = "gauge+number", value = row['AI_Score'],
+            title = {'text': f"{row['Ticker']} AI SCORE"},
+            gauge = {'axis': {'range': [0, 100]}, 'bar': {'color': "#00f3ff"},
+                     'steps': [{'range': [0, 50], 'color': "rgba(255,0,0,0.2)"}, {'range': [50, 100], 'color': "rgba(0,255,0,0.2)"}]}
+        ))
+        fig_g.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', height=250, margin=dict(l=20,r=20,t=50,b=20))
+        gauges.append(dbc.Col(dcc.Graph(figure=fig_g), width=12, md=4))
+
+    tab3_content = dbc.Row(gauges, className="mt-4 glass-x p-4")
+
+    # --- 最终页面 ---
     return html.Div([
-        # 侧边栏
-        html.Div([
-            html.H3("AURORA", className="text-white mb-1"),
-            html.Div("PRO TERMINAL", className="label mb-5"),
-            
-            # KPI 1: 总资产
-            html.Div("NET LIQUIDITY", className="label"),
-            html.Div(f"${kpi['total_val']:,.0f}", className="val-lg mb-4 mono"),
-            
-            # KPI 2: 总盈亏
-            html.Div([
-                html.Div("TOTAL P/L", className="label"),
-                html.Div(f"{kpi['total_pnl']:+,.0f}", className=f"val-md mono {'green' if kpi['total_pnl']>0 else 'red'}"),
-                html.Div(f"{kpi['total_roi']:+.2%}", className=f"mono {'green' if kpi['total_roi']>0 else 'red'}", style={'fontSize':'0.9rem'})
+        # 1. 顶部行情
+        html.Div(html.Div(ticker_items * 5, className="ticker-move"), className="ticker-wrap"),
+        
+        # 2. 主体容器
+        dbc.Container([
+            # 标题与时间
+            dbc.Row([
+                dbc.Col([
+                    html.H1(["AURORA", html.Span(" X", style={'color':'#00f3ff'})], className="font-sci mb-0"),
+                    html.P(f"SYSTEM TIME: {datetime.now().strftime('%H:%M:%S UTC')} | MODE: {'SIMULATION' if is_sim else 'LIVE'}", 
+                           className="font-data text-muted", style={'fontSize':'12px'})
+                ], className="text-center mt-5 mb-4")
+            ]),
+
+            # 核心 KPI HUD
+            dbc.Row([
+                dbc.Col(html.Div([
+                    html.Div("NET ASSETS", className="text-muted font-sci", style={'fontSize':'10px'}),
+                    html.Div(f"${kpi['val']:,.0f}", className="font-data", style={'fontSize':'36px', 'color':'#fff'})
+                ], className="glass-x p-3 text-center"), width=6, lg=3),
+                dbc.Col(html.Div([
+                    html.Div("TOTAL ROI", className="text-muted font-sci", style={'fontSize':'10px'}),
+                    html.Div(f"{kpi['roi']:+.2%}", className="font-data", style={'fontSize':'36px', 'color': '#00ff9d' if kpi['roi']>0 else '#ff0055'})
+                ], className="glass-x p-3 text-center"), width=6, lg=3),
+                dbc.Col(html.Div([
+                    html.Div("UNREALIZED PNL", className="text-muted font-sci", style={'fontSize':'10px'}),
+                    html.Div(f"${kpi['pnl']:+,.0f}", className="font-data", style={'fontSize':'36px', 'color': '#00ff9d' if kpi['pnl']>0 else '#ff0055'})
+                ], className="glass-x p-3 text-center"), width=6, lg=3),
+                dbc.Col(html.Div([
+                    html.Div("DAY CHANGE", className="text-muted font-sci", style={'fontSize':'10px'}),
+                    html.Div(f"${kpi['day']:+,.0f}", className="font-data", style={'fontSize':'36px', 'color': '#00ff9d' if kpi['day']>0 else '#ff0055'})
+                ], className="glass-x p-3 text-center"), width=6, lg=3),
             ], className="mb-4"),
-            
-            # KPI 3: 今日盈亏 (视频核心功能)
-            html.Div([
-                html.Div("DAY'S P/L", className="label"),
-                html.Div(f"{kpi['day_pnl']:+,.0f}", className=f"val-md mono {'green' if kpi['day_pnl']>0 else 'red'}"),
-            ], className="mb-4"),
-            
-            html.Hr(style={'borderColor':'rgba(255,255,255,0.1)'}),
-            
-            # 状态
-            html.Div([
-                html.Span("●", className="green" if "LIVE" in kpi['status'] else "red", style={'marginRight':'10px'}),
-                html.Span(kpi['status'], className="label")
-            ])
-            
-        ], className="glass", style={'gridArea': '1 / 1 / 3 / 2', 'padding':'30px', 'display':'flex', 'flexDirection':'column'}),
 
-        # 顶部：风险分析图
-        html.Div([
-            dcc.Graph(figure=fig_risk, config={'displayModeBar': False}, style={'height':'100%'})
-        ], className="glass", style={'gridArea': '1 / 2 / 2 / 3', 'padding':'15px'}),
+            # 功能区 Tabs
+            dbc.Tabs([
+                dbc.Tab(tab1_content, label="COMMAND CENTER", tab_style={'marginLeft':'auto'}),
+                dbc.Tab(tab2_content, label="3D QUANTUM LAB"),
+                dbc.Tab(tab3_content, label="AI SENTIMENT"),
+            ], className="font-sci"),
 
-        # 主内容：超级表格
-        html.Div([
-            html.Div([
-                html.H4("Active Holdings", className="text-white"),
-                html.Div("Real-time Sector & Risk Analysis", style={'color':'#64748b', 'fontSize':'0.9rem'})
-            ], className="mb-3 px-2"),
-            
-            dash_table.DataTable(
-                data=df.to_dict('records'),
-                columns=[
-                    {'name': 'Ticker', 'id': 'Ticker'},
-                    {'name': 'Sector', 'id': 'Sector'},
-                    {'name': 'Beta', 'id': 'Beta', 'type': 'numeric', 'format': {'specifier': '.2f'}},
-                    {'name': 'Mkt Cap', 'id': 'Mkt Cap'},
-                    {'name': 'Price', 'id': 'Price', 'type': 'numeric', 'format': {'specifier': '$,.2f'}},
-                    {'name': '1D %', 'id': 'Change%', 'type': 'numeric', 'format': {'specifier': '+.2%'}},
-                    {'name': 'Value', 'id': 'Value', 'type': 'numeric', 'format': {'specifier': '$,.0f'}},
-                    {'name': 'Total P/L', 'id': 'Total PnL', 'type': 'numeric', 'format': {'specifier': '+,.0f'}}, # 这里去掉了$
-                    {'name': 'ROI', 'id': 'ROI', 'type': 'numeric', 'format': {'specifier': '+.1%'}},
-                ],
-                style_as_list_view=True,
-                style_data_conditional=[
-                    # 涨跌颜色逻辑
-                    {'if': {'filter_query': '{Total PnL} >= 0', 'column_id': 'Total PnL'}, 'color': '#4ade80', 'fontWeight': 'bold'},
-                    {'if': {'filter_query': '{Total PnL} < 0', 'column_id': 'Total PnL'}, 'color': '#fb7185', 'fontWeight': 'bold'},
-                    {'if': {'filter_query': '{Change%} >= 0', 'column_id': 'Change%'}, 'color': '#4ade80'},
-                    {'if': {'filter_query': '{Change%} < 0', 'column_id': 'Change%'}, 'color': '#fb7185'},
-                    {'if': {'filter_query': '{ROI} >= 0', 'column_id': 'ROI'}, 'color': '#4ade80'},
-                    {'if': {'filter_query': '{ROI} < 0', 'column_id': 'ROI'}, 'color': '#fb7185'},
-                ],
-                sort_action="native", # 允许点击表头排序
-            )
-        ], className="glass", style={'gridArea': '2 / 2 / 3 / 3', 'padding':'20px', 'overflowY':'auto'}),
-
-    ], className="main-grid")
+        ], fluid=True, style={'paddingTop': '40px'}) # 给顶部滚动条留出空间
+    ])
 
 app.layout = serve_layout
 
