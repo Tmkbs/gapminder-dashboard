@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 import os
 import random
 import numpy as np
+from datetime import datetime # <--- 补上了这一行，这次绝对没问题了
 
 # --- 1. 视觉核心: 动态极光 CSS ---
 EXTERNAL_STYLES = [
@@ -111,7 +112,7 @@ app = dash.Dash(__name__, external_stylesheets=EXTERNAL_STYLES)
 server = app.server
 app.index_string = f'''<!DOCTYPE html><html><head>{{%metas%}}<title>AURORA WEALTH</title>{{%favicon%}}{{%css%}}<style>{CUSTOM_CSS}</style></head><body>{{%app_entry%}}<footer>{{%config%}}{{%scripts%}}{{%renderer%}}</footer></body></html>'''
 
-# --- 2. 数据引擎 (保持不变，因为逻辑是完美的) ---
+# --- 2. 数据引擎 ---
 def get_data_engine():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     excel_path = os.path.join(base_dir, 'portfolio.xlsx')
@@ -171,17 +172,16 @@ def get_data_engine():
     
     return res, res['Value'].sum(), res['PnL'].sum(), res['PnL'].sum()/res['cost'].sum(), is_sim
 
-# --- 3. 页面布局 (极光架构) ---
+# --- 3. 页面布局 ---
 def serve_layout():
     df, tot_val, tot_pnl, tot_ret, is_sim = get_data_engine()
     status_cls = "tag tag-live" if not is_sim else "tag tag-sim"
     status_txt = "LIVE CONNECTION" if not is_sim else "SIMULATION MODE"
 
-    # 图表配色：使用高级的紫色/青色渐变
+    # 图表配色
     colors = ['#4CC9F0', '#4361EE', '#3A0CA3', '#7209B7', '#F72585']
 
     # 图表1：波浪面积图 (模拟趋势)
-    # 这里生成一个假的趋势图，增加视觉丰富度
     x_trend = np.linspace(0, 10, 100)
     y_trend = np.sin(x_trend) + np.random.normal(0, 0.1, 100) + (x_trend/2)
     fig_trend = go.Figure(go.Scatter(
@@ -204,7 +204,7 @@ def serve_layout():
 
     return html.Div([
         
-        # 左侧边栏：核心数据
+        # 左侧边栏
         html.Div([
             html.H3("AURORA", className="mb-1", style={'color':'#fff'}),
             html.Div("WEALTH OS v2.0", className="label-muted mb-5"),
@@ -232,7 +232,7 @@ def serve_layout():
             html.Div(className="divider"),
             html.Div([
                 html.Span(status_txt, className=status_cls)
-            ], className="mt-auto") # 推到底部
+            ], className="mt-auto")
 
         ], className="glass-panel sidebar"),
 
@@ -240,15 +240,14 @@ def serve_layout():
         html.Div([
             html.Div("PORTFOLIO OVERVIEW", className="label-muted", style={'fontSize':'1rem'}),
             html.Div([
-                # 这里可以放一些顶部的小按钮或时间，暂时留空
+                # 使用 datetime.now() 显示当前时间
                 html.Span(datetime.now().strftime("%B %d, %Y"), className="label-muted")
             ])
         ], className="header-area glass-panel", style={'gridArea': '1 / 2 / 2 / 3', 'display': 'flex', 'alignItems': 'center'}),
 
-        # 主内容区：下方网格
+        # 主内容区
         html.Div([
-            
-            # 中间：持仓表格 (占据主要空间)
+            # 持仓表格
             html.Div([
                 html.Div([
                     html.H5("Active Positions", style={'fontWeight':'700'}),
@@ -276,7 +275,7 @@ def serve_layout():
                 ], style={'overflowY': 'auto', 'height': '400px'})
             ], className="glass-panel p-4", style={'gridArea': '1 / 1 / 2 / 2', 'display': 'flex', 'flexDirection': 'column'}),
 
-            # 右侧：分布图
+            # 分布图
             html.Div([
                 html.H5("Allocation", style={'fontWeight':'700', 'marginBottom':'20px', 'textAlign':'center'}),
                 dcc.Graph(figure=fig_donut, config={'displayModeBar': False})
