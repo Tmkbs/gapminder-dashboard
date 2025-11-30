@@ -1,120 +1,124 @@
 import dash
-from dash import dcc, html, dash_table
+from dash import dcc, html, dash_table, Input, Output
 import dash_bootstrap_components as dbc
 import pandas as pd
 import yfinance as yf
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+from datetime import datetime, timedelta
+import random
 
-# --- 1. 样式定义: 终极赛博朋克玻璃拟态 (Glassmorphism) ---
-# 这里的 CSS 是为了让界面看起来像高级金融终端
+# --- 1. 赛博朋克极致样式 (CSS) ---
 CUSTOM_CSS = """
 body {
-    background: radial-gradient(circle at 10% 20%, rgb(20, 20, 30) 0%, rgb(0, 0, 0) 90%);
+    background-color: #050505;
+    background-image: 
+        linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 30px 30px;
+    font-family: 'Roboto Mono', monospace;
     color: #e0e0e0;
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    overflow-x: hidden;
 }
-.glass-card {
-    background: rgba(30, 34, 45, 0.6);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+/* 霓虹滚动条 */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #000; }
+::-webkit-scrollbar-thumb { background: #00cc96; border-radius: 4px; }
+
+/* 玻璃卡片 */
+.cyber-card {
+    background: rgba(16, 20, 25, 0.85);
+    border: 1px solid rgba(0, 204, 150, 0.2);
+    box-shadow: 0 0 15px rgba(0, 204, 150, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 4px;
+    margin-bottom: 20px;
+    position: relative;
     overflow: hidden;
 }
-.glass-card:hover {
-    box-shadow: 0 8px 32px 0 rgba(0, 255, 255, 0.15);
-    border: 1px solid rgba(0, 255, 255, 0.3);
+.cyber-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, #00cc96, transparent);
+    animation: scanline 3s infinite linear;
 }
-.gradient-text {
-    background: linear-gradient(45deg, #00f2ea, #ff0050);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-weight: 800;
+@keyframes scanline { 0% {transform: translateX(-100%);} 100% {transform: translateX(100%);} }
+
+/* 滚动行情条 */
+.ticker-wrap {
+    width: 100%;
+    background-color: #000;
+    border-bottom: 1px solid #333;
+    overflow: hidden;
+    height: 30px;
+    line-height: 30px;
+    white-space: nowrap;
 }
-.kpi-title {
-    color: #8b9bb4;
-    font-size: 0.9rem;
+.ticker-move { display: inline-block; animation: ticker 20s infinite linear; }
+.ticker-item { display: inline-block; padding: 0 20px; font-size: 14px; }
+@keyframes ticker { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
+.up { color: #00cc96; } .down { color: #ef553b; }
+
+/* 选项卡样式 */
+.custom-tabs .nav-link {
+    color: #555 !important;
+    border: 1px solid transparent !important;
+    font-weight: bold;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
 }
-.kpi-value {
-    color: #ffffff;
-    font-size: 2rem;
-    font-weight: 700;
-    text-shadow: 0 0 10px rgba(255,255,255,0.3);
+.custom-tabs .nav-link.active {
+    background-color: transparent !important;
+    color: #00cc96 !important;
+    border-bottom: 2px solid #00cc96 !important;
+    text-shadow: 0 0 10px rgba(0, 204, 150, 0.6);
 }
 """
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
 server = app.server
+app.index_string = f'''<!DOCTYPE html><html><head>{{%metas%}}<title>QUANTUM TRADER</title>{{%favicon%}}{{%css%}}<style>{CUSTOM_CSS}</style></head><body>{{%app_entry%}}<footer>{{%config%}}{{%scripts%}}{{%renderer%}}</footer></body></html>'''
 
-# 注入自定义 CSS
-app.index_string = f'''
-<!DOCTYPE html>
-<html>
-    <head>
-        {{%metas%}}
-        <title>Ultimate Portfolio</title>
-        {{%favicon%}}
-        {{%css%}}
-        <style>{CUSTOM_CSS}</style>
-    </head>
-    <body>
-        {{%app_entry%}}
-        <footer>
-            {{%config%}}
-            {{%scripts%}}
-            {{%renderer%}}
-        </footer>
-    </body>
-</html>
-'''
+# --- 2. 量子模拟引擎 (核心容错) ---
+def generate_fake_kline(ticker, days=100):
+    """生成逼真的 K 线数据 (防止 API 挂掉时页面空白)"""
+    dates = pd.date_range(end=datetime.now(), periods=days)
+    base_price = random.uniform(100, 1000)
+    data = []
+    price = base_price
+    for d in dates:
+        change = np.random.normal(0, base_price * 0.02)
+        open_p = price
+        close_p = price + change
+        high_p = max(open_p, close_p) + abs(np.random.normal(0, base_price * 0.01))
+        low_p = min(open_p, close_p) - abs(np.random.normal(0, base_price * 0.01))
+        vol = int(np.random.uniform(100000, 5000000))
+        data.append([d, open_p, high_p, low_p, close_p, vol])
+        price = close_p
+    df = pd.DataFrame(data, columns=['Date', 'Open', 'High', 'Low', 'Close', 'Volume'])
+    return df
 
-# --- 2. 核心数据逻辑 (带超强容错) ---
-def get_data():
-    # 初始化空 DataFrame
-    df = pd.DataFrame()
-    use_demo_data = False
-
-    # A. 尝试读取 CSV
+def get_data_engine():
+    # A. 基础持仓数据
     try:
-        df = pd.read_csv('data_transactions.csv')
-        # 强制标准化列名 (防止 KeyError)
-        df.columns = df.columns.str.strip().str.title()
-        
-        required = ['Ticker', 'Quantity', 'Price', 'Action']
-        if not all(col in df.columns for col in required):
-            raise ValueError("Missing columns")
-            
-    except Exception as e:
-        print(f"⚠️ 数据读取失败或文件为空，启用演示模式: {e}")
-        use_demo_data = True
-
-    # B. 如果读取失败或没数据，生成高仿真演示数据
-    if use_demo_data or df.empty:
-        df = pd.DataFrame([
-            {'Ticker': 'AAPL', 'Action': 'Buy', 'Quantity': 50, 'Price': 145.00},
-            {'Ticker': 'NVDA', 'Action': 'Buy', 'Quantity': 20, 'Price': 350.00},
-            {'Ticker': 'TSLA', 'Action': 'Buy', 'Quantity': 60, 'Price': 180.00},
-            {'Ticker': 'MSFT', 'Action': 'Buy', 'Quantity': 30, 'Price': 280.00},
-            {'Ticker': 'BTC-USD', 'Action': 'Buy', 'Quantity': 0.5, 'Price': 25000.00},
-            {'Ticker': 'ETH-USD', 'Action': 'Buy', 'Quantity': 5, 'Price': 1800.00},
+        df_trans = pd.read_csv('data_transactions.csv')
+        df_trans.columns = df_trans.columns.str.strip().str.title()
+    except:
+        # 默认演示数据
+        df_trans = pd.DataFrame([
+            {'Ticker': 'AAPL', 'Action': 'Buy', 'Quantity': 100, 'Price': 150},
+            {'Ticker': 'NVDA', 'Action': 'Buy', 'Quantity': 50, 'Price': 400},
+            {'Ticker': 'BTC-USD', 'Action': 'Buy', 'Quantity': 1, 'Price': 30000},
+            {'Ticker': 'TSLA', 'Action': 'Buy', 'Quantity': 200, 'Price': 180},
         ])
 
-    # C. 计算持仓
+    # 汇总持仓
     portfolio = {}
-    for _, row in df.iterrows():
-        t = row['Ticker'].upper().strip()
-        q = float(row['Quantity'])
-        p = float(row['Price'])
-        a = row['Action'].lower()
-        
+    for _, row in df_trans.iterrows():
+        t, q, p, a = row['Ticker'].upper(), row['Quantity'], row['Price'], row['Action'].lower()
         if t not in portfolio: portfolio[t] = {'qty': 0, 'cost': 0}
-        
         if 'buy' in a:
             portfolio[t]['qty'] += q
             portfolio[t]['cost'] += (q * p)
@@ -123,198 +127,170 @@ def get_data():
                 avg = portfolio[t]['cost'] / portfolio[t]['qty']
                 portfolio[t]['qty'] -= q
                 portfolio[t]['cost'] -= (q * avg)
+    
+    df = pd.DataFrame.from_dict(portfolio, orient='index').reset_index()
+    if df.empty: return pd.DataFrame(), 0, 0, 0
+    df.rename(columns={'index': 'Ticker'}, inplace=True)
+    df = df[df['qty'] > 0].copy()
 
-    # 转换为 DataFrame
-    res = pd.DataFrame.from_dict(portfolio, orient='index').reset_index()
-    if res.empty: return pd.DataFrame(), 0, 0, 0 # 极端情况
-    res.rename(columns={'index': 'Ticker', 'qty': 'Quantity', 'cost': 'Total Cost'}, inplace=True)
-    res = res[res['Quantity'] > 0].copy()
-
-    # D. 获取实时行情 (带 Fallback)
-    ticker_list = res['Ticker'].tolist()
-    prices, sectors, names = [], [], []
+    # B. 尝试获取实时数据 (带自动降级)
+    prices, sectors, changes = [], [], []
+    use_simulation = False
     
     try:
-        data = yf.Tickers(' '.join(ticker_list))
-        for t in ticker_list:
-            try:
-                info = data.tickers[t].info
-                # 优先取 currentPrice，取不到取 regularMarketPrice，再取不到取 previousClose
-                p = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('previousClose') or 0
-                s = info.get('sector', 'Crypto/Other')
-                n = info.get('shortName', t)
-            except:
-                p, s, n = 0, 'Unknown', t
-            
-            # 如果 API 彻底挂了 (p=0)，为了演示美观，生成一个基于成本的模拟波动价格
-            if p == 0:
-                cost_per_share = portfolio[t]['cost'] / portfolio[t]['qty']
-                # 随机生成一个 -20% 到 +40% 的波动，让图表看起来真实
-                import random
-                p = cost_per_share * random.uniform(0.8, 1.4)
-                
+        # 这里的 timeout 很关键，PA Free Tier 会在这里卡死
+        data = yf.Tickers(' '.join(df['Ticker'].tolist()))
+        for t in df['Ticker']:
+            info = data.tickers[t].info
+            if 'regularMarketPrice' not in info and 'currentPrice' not in info: raise Exception("No Data")
+            p = info.get('currentPrice', info.get('regularMarketPrice', 0))
             prices.append(p)
-            sectors.append(s)
-            names.append(n)
-            
+            sectors.append(info.get('sector', 'Tech'))
+            prev = info.get('previousClose', p)
+            changes.append((p - prev)/prev)
     except:
-        # 极度防御：如果 yfinance 完全连不上
-        prices = [portfolio[t]['cost']/portfolio[t]['qty'] * 1.1 for t in ticker_list]
-        sectors = ['Tech'] * len(ticker_list)
-        names = ticker_list
+        use_simulation = True # 触发模拟模式
+        for t in df['Ticker']:
+            # 生成随机波动价格
+            sim_price = (portfolio[t]['cost'] / portfolio[t]['qty']) * random.uniform(0.9, 1.3)
+            prices.append(sim_price)
+            sectors.append(random.choice(['Technology', 'Crypto', 'Automotive', 'AI']))
+            changes.append(random.uniform(-0.05, 0.05))
 
-    res['Current Price'] = prices
-    res['Sector'] = sectors
-    res['Name'] = names
-    
-    # E. 计算指标
-    res['Market Value'] = res['Quantity'] * res['Current Price']
-    res['PnL'] = res['Market Value'] - res['Total Cost']
-    res['PnL %'] = (res['PnL'] / res['Total Cost']) * 100
-    
-    # 汇总
-    total_val = res['Market Value'].sum()
-    total_cost = res['Total Cost'].sum()
-    total_pnl = total_val - total_cost
-    total_ret = (total_pnl / total_cost * 100) if total_cost > 0 else 0
-    
-    return res, total_val, total_pnl, total_ret
+    df['Price'] = prices
+    df['Sector'] = sectors
+    df['Change'] = changes
+    df['Value'] = df['qty'] * df['Price']
+    df['PnL'] = df['Value'] - df['cost']
+    df['PnL%'] = df['PnL'] / df['cost']
 
-# --- 3. 布局逻辑 ---
+    return df, df['Value'].sum(), df['PnL'].sum(), (df['PnL'].sum()/df['cost'].sum()), use_simulation
+
+# --- 3. 页面布局 ---
 def serve_layout():
-    df, tot_val, tot_pnl, tot_ret = get_data()
+    df, tot_val, tot_pnl, tot_ret, is_sim = get_data_engine()
     
-    # 颜色处理
-    color_pnl = "#00f2ea" if tot_pnl >= 0 else "#ff0050" # 青色赢，红色输
+    # 顶部滚动条内容
+    ticker_html = []
+    for _, row in df.iterrows():
+        color = "up" if row['Change'] >= 0 else "down"
+        arrow = "▲" if row['Change'] >= 0 else "▼"
+        ticker_html.append(html.Span(f"{row['Ticker']} ${row['Price']:.2f} {arrow} {row['Change']:.2%}   ///   ", className=f"ticker-item {color}"))
     
-    # --- 图表 1: 旭日图 (Sunburst) - 高级资产分布 ---
-    # 比饼图更帅，显示 板块 -> 股票 的层级
-    if not df.empty:
-        fig_sun = px.sunburst(df, path=['Sector', 'Ticker'], values='Market Value',
-                              color='PnL %', 
-                              color_continuous_scale='Bluered_r', # 红蓝渐变
-                              color_continuous_midpoint=0)
-        fig_sun.update_layout(
-            margin=dict(t=0, l=0, r=0, b=0),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(family="Roboto", size=14, color="#fff")
-        )
-        
-        # --- 图表 2: 极光条形图 (Bar) - 个股盈亏 ---
-        fig_bar = go.Figure()
-        fig_bar.add_trace(go.Bar(
-            y=df['Ticker'], x=df['PnL'], orientation='h',
-            marker=dict(
-                color=df['PnL'],
-                colorscale='Bluered_r', # 保持色调一致
-                line=dict(color='rgba(255,255,255,0.2)', width=1)
-            )
-        ))
-        fig_bar.update_layout(
-            title={'text': "PnL Performance", 'font': {'color': 'white'}},
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(showgrid=False, zeroline=True, zerolinecolor='rgba(255,255,255,0.5)', tickfont=dict(color='gray')),
-            yaxis=dict(showgrid=False, tickfont=dict(color='white')),
-            margin=dict(t=40, l=5, r=5, b=5),
-            height=300
-        )
-    else:
-        fig_sun, fig_bar = go.Figure(), go.Figure()
+    # 状态指示灯
+    status_text = "🟢 LIVE DATA CONNECTION" if not is_sim else "🟠 QUANTUM SIMULATION MODE (OFFLINE)"
+    status_color = "#00cc96" if not is_sim else "#ffa500"
 
-    # --- 格式化表格 ---
-    df_show = df[['Name', 'Quantity', 'Current Price', 'Market Value', 'PnL', 'PnL %']].copy()
-    for col in ['Current Price', 'Market Value', 'PnL']:
-        df_show[col] = df_show[col].apply(lambda x: f"${x:,.2f}")
-    df_show['PnL %'] = df_show['PnL %'].apply(lambda x: f"{x:+.2f}%")
+    return html.Div([
+        # 1. 顶部行情条
+        html.Div(html.Div(ticker_html * 5, className="ticker-move"), className="ticker-wrap"),
 
-    # --- 页面组件 ---
-    return dbc.Container([
-        # 顶部：Logo
-        dbc.Row([
-            dbc.Col(html.H1("PORTFOLIO // VISUALIZER", className="text-center mb-5 mt-4 gradient-text"), width=12)
-        ]),
+        dbc.Container([
+            # 2. 标题区
+            dbc.Row([
+                dbc.Col([
+                    html.H1("QUANTUM // ASSETS", className="mt-4 mb-0", style={'fontWeight': 900, 'letterSpacing': '4px'}),
+                    html.P(status_text, style={'color': status_color, 'fontSize': '12px', 'marginTop': '5px', 'opacity': 0.8})
+                ], width=12)
+            ]),
 
-        # 第一行：3个核心 KPI 玻璃卡片
-        dbc.Row([
-            dbc.Col(html.Div([
-                html.Div("NET ASSETS", className="kpi-title"),
-                html.Div(f"${tot_val:,.2f}", className="kpi-value")
-            ], className="glass-card p-4"), width=12, md=4, className="mb-4"),
-            
-            dbc.Col(html.Div([
-                html.Div("TOTAL P&L ($)", className="kpi-title"),
-                html.Div(f"{tot_pnl:+,.2f}", className="kpi-value", style={'color': color_pnl})
-            ], className="glass-card p-4"), width=12, md=4, className="mb-4"),
+            # 3. 核心 KPI (玻璃卡片)
+            dbc.Row([
+                dbc.Col(html.Div([
+                    html.H6("TOTAL EQUITY", style={'color': '#888'}),
+                    html.H2(f"${tot_val:,.2f}", style={'color': '#fff', 'textShadow': '0 0 15px rgba(255,255,255,0.5)'}),
+                ], className="cyber-card p-4"), width=12, lg=4),
+                dbc.Col(html.Div([
+                    html.H6("UNREALIZED P&L", style={'color': '#888'}),
+                    html.H2(f"${tot_pnl:+,.2f}", style={'color': '#00cc96' if tot_pnl>0 else '#ef553b'}),
+                ], className="cyber-card p-4"), width=12, lg=4),
+                dbc.Col(html.Div([
+                    html.H6("PERFORMANCE", style={'color': '#888'}),
+                    html.H2(f"{tot_ret:+.2%}", style={'color': '#00cc96' if tot_ret>0 else '#ef553b'}),
+                ], className="cyber-card p-4"), width=12, lg=4),
+            ], className="mb-2"),
 
-            dbc.Col(html.Div([
-                html.Div("RETURN ROI (%)", className="kpi-title"),
-                html.Div(f"{tot_ret:+.2f}%", className="kpi-value", style={'color': color_pnl})
-            ], className="glass-card p-4"), width=12, md=4, className="mb-4"),
-        ]),
+            # 4. 复杂功能 Tabs
+            dbc.Tabs([
+                # TAB 1: 概览
+                dbc.Tab(label="DASHBOARD OVERVIEW", tab_id="tab-1", children=[
+                    dbc.Row([
+                        dbc.Col(html.Div([
+                            html.H5("PORTFOLIO COMPOSITION", className="text-white mb-3"),
+                            dcc.Graph(
+                                figure=px.sunburst(df, path=['Sector', 'Ticker'], values='Value', color='PnL%', 
+                                                 color_continuous_scale='RdYlGn', color_continuous_midpoint=0)
+                                .update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', margin=dict(t=0, b=0, l=0, r=0), height=350)
+                            )
+                        ], className="cyber-card p-3 h-100"), width=12, md=5),
+                        
+                        dbc.Col(html.Div([
+                            html.H5("ASSET PERFORMANCE", className="text-white mb-3"),
+                            dcc.Graph(
+                                figure=px.bar(df, x='Ticker', y='PnL', color='PnL', color_continuous_scale=['#ef553b', '#00cc96'])
+                                .update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False, height=350)
+                            )
+                        ], className="cyber-card p-3 h-100"), width=12, md=7),
+                    ], className="mt-3")
+                ]),
 
-        # 第二行：图表区域
-        dbc.Row([
-            # 左侧：旭日图
-            dbc.Col(html.Div([
-                html.H5("Asset Allocation", className="text-white mb-3", style={'opacity':0.8}),
-                dcc.Graph(figure=fig_sun, config={'displayModeBar': False})
-            ], className="glass-card p-3 h-100"), width=12, md=6, className="mb-4"),
+                # TAB 2: 技术分析 (K线图)
+                dbc.Tab(label="TECHNICAL ANALYSIS", tab_id="tab-2", children=[
+                    dbc.Row([
+                        dbc.Col(html.Div([
+                            html.Div([
+                                html.Label("SELECT ASSET:", className="me-2 text-info"),
+                                dcc.Dropdown(
+                                    id='ticker-select',
+                                    options=[{'label': t, 'value': t} for t in df['Ticker']],
+                                    value=df['Ticker'].iloc[0] if not df.empty else None,
+                                    style={'width': '200px', 'color': '#000'}
+                                )
+                            ], className="d-flex align-items-center mb-3"),
+                            dcc.Graph(id='kline-chart')
+                        ], className="cyber-card p-4 mt-3"), width=12)
+                    ])
+                ])
+            ], className="custom-tabs", active_tab="tab-1"),
 
-            # 右侧：条形图 + 简报
-            dbc.Col(html.Div([
-                dcc.Graph(figure=fig_bar, config={'displayModeBar': False})
-            ], className="glass-card p-3 h-100"), width=12, md=6, className="mb-4"),
-        ]),
-
-        # 第三行：详细持仓表
-        dbc.Row([
-            dbc.Col(html.Div([
-                html.H5("Live Market Data", className="text-white mb-3 ps-2", style={'opacity':0.8}),
-                dash_table.DataTable(
-                    data=df_show.to_dict('records'),
-                    columns=[{'name': i, 'id': i} for i in df_show.columns],
-                    style_as_list_view=True,
-                    style_header={
-                        'backgroundColor': 'rgba(0,0,0,0)',
-                        'color': '#00f2ea',
-                        'fontWeight': 'bold',
-                        'borderBottom': '1px solid rgba(255,255,255,0.2)',
-                        'textTransform': 'uppercase'
-                    },
-                    style_cell={
-                        'backgroundColor': 'rgba(0,0,0,0)',
-                        'color': '#e0e0e0',
-                        'border': 'none',
-                        'padding': '12px',
-                        'fontFamily': 'Roboto Mono'
-                    },
-                    style_data_conditional=[
-                        {
-                            'if': {'filter_query': '{PnL} contains "-"', 'column_id': 'PnL'},
-                            'color': '#ff0050', 'fontWeight': 'bold'
-                        },
-                        {
-                            'if': {'filter_query': '{PnL} contains "-"', 'column_id': 'PnL %'},
-                            'color': '#ff0050', 'fontWeight': 'bold'
-                        },
-                        {
-                            'if': {'column_id': 'PnL'},
-                            'color': '#00f2ea', 'fontWeight': 'bold'
-                        },
-                        {
-                            'if': {'column_id': 'PnL %'},
-                            'color': '#00f2ea', 'fontWeight': 'bold'
-                        }
-                    ]
-                )
-            ], className="glass-card p-4"), width=12)
-        ], className="mb-5")
-
-    ], fluid=True)
+        ], fluid=True, className="pb-5")
+    ])
 
 app.layout = serve_layout
+
+# --- 4. 回调函数：处理 K 线图 ---
+@app.callback(
+    Output('kline-chart', 'figure'),
+    [Input('ticker-select', 'value')]
+)
+def update_kline(ticker):
+    if not ticker: return go.Figure()
+    
+    # 尝试获取真实历史数据，如果失败则生成模拟数据
+    try:
+        # 如果是模拟模式，直接跳过 API
+        df_k = yf.Ticker(ticker).history(period="6mo")
+        if df_k.empty: raise Exception("Empty")
+        title_text = f"{ticker} // LIVE MARKET DATA"
+    except:
+        df_k = generate_fake_kline(ticker, 180) # 生成 180 天模拟数据
+        title_text = f"{ticker} // SIMULATED QUANTUM DATA"
+
+    # 画专业的 K 线图
+    fig = go.Figure(data=[go.Candlestick(x=df_k.index if 'Date' not in df_k else df_k['Date'],
+                open=df_k['Open'], high=df_k['High'], low=df_k['Low'], close=df_k['Close'],
+                increasing_line_color='#00cc96', decreasing_line_color='#ef553b')])
+
+    fig.update_layout(
+        title=title_text,
+        template="plotly_dark",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis_rangeslider_visible=False,
+        height=500,
+        font={'family': 'Roboto Mono'}
+    )
+    return fig
 
 if __name__ == '__main__':
     app.run(debug=True)
