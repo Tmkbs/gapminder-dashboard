@@ -1,0 +1,27 @@
+REM --- [步骤 1: 进入项目文件夹] ---
+cd /d "E:\HuaweiMoveData\Users\52651\Desktop\4710"
+
+REM --- [步骤 2: 更新依赖清单] ---
+pip freeze > requirements.txt
+
+REM --- [步骤 3: 提交代码到 GitHub] ---
+git add .
+git commit -m "Update stock dashboard code"
+git push origin main
+
+REM --- [本地操作结束] ---
+
+# --- [步骤 1: 进入项目文件夹 (假设文件夹名同仓库名)] ---
+cd ~/gapminder-dashboard
+
+# --- [步骤 2: 拉取最新代码] ---
+git pull origin main
+
+# --- [步骤 3: 激活虚拟环境 (名字请替换为你实际创建的)] ---
+# 如果不记得名字，先输入 lsvirtualenv 查看
+workon my-stock-env
+
+# --- [步骤 4: 安装可能新增的库] ---
+pip install -r requirements.txt
+
+# --- [云端操作结束，记得去 Web Tab 点击 Reload] ---
